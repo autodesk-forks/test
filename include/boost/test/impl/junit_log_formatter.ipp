@@ -20,6 +20,7 @@
 #include <boost/test/utils/basic_cstring/io.hpp>
 #include <boost/test/utils/xml_printer.hpp>
 #include <boost/test/utils/string_cast.hpp>
+#include <boost/test/framework.hpp>
 
 // Boost
 #include <boost/version.hpp>
@@ -139,10 +140,10 @@ junit_log_formatter::log_start( std::ostream& ostr, counter_t test_cases_amount)
 void
 junit_log_formatter::log_finish( std::ostream& ostr )
 {
-    std::set<std::string> to_be_processed, to_be_processed_next;
+    std::set<test_unit_id> to_be_processed, to_be_processed_next;
     for(map_trace_t::iterator it(map_tests.begin()); it != map_tests.end(); ++it)
     {
-      if(it->second.test_type == TUT_CASE)
+      if(it->second.tu_type == TUT_CASE)
       {
         to_be_processed.insert(it->first);
       }
@@ -154,45 +155,56 @@ junit_log_formatter::log_finish( std::ostream& ostr )
     while(!to_be_processed.empty())
     {
       to_be_processed_next.clear();
-      for(std::set<std::string>::const_iterator it(to_be_processed.begin()); it != to_be_processed.end(); ++it)
+      for(std::set<test_unit_id>::const_iterator it(to_be_processed.begin()); it != to_be_processed.end(); ++it)
       {
         std::ostringstream o_current_test;
         const junit_impl::test_unit_& v = map_tests[*it];
         to_be_processed.erase(it);
 
-        // report the assertion counts to the parent, fist start with the leaves that are test units
-        if(!v.parent.empty())
-        {
-           to_be_processed_next.insert(v.parent);
-        }
-        junit_impl::test_unit_& parent = v.parent.empty() ? root : map_tests[v.parent];
+        test_unit& unit = boost::unit_test::framework::get( *it, v.tu_type );
 
-        parent.assertions += v.assertions;
-        parent.failure_nb += v.failure_nb;
-        parent.error_nb += v.error_nb;
-        parent.disabled_nb += v.disabled_nb;
-        parent.test_nb += v.test_type == TUT_CASE ? 1 : v.test_nb;
+
+        // report the assertion counts to the parent, fist start with the leaves that are test units
+        if(unit.p_parent_id)
+        {
+           to_be_processed_next.insert(unit.p_parent_id);
+        }
+        junit_impl::test_unit_& parent = !unit.p_parent_id ? root : map_tests[unit.p_parent_id];
+
+        parent.test_nb += v.tu_type == TUT_CASE ? 1 : v.test_nb;
         parent.time += v.time;
       }
 
       to_be_processed = to_be_processed_next;
-      for(std::set<std::string>::iterator it(to_be_processed_next.begin()); it != to_be_processed_next.end(); ++it)
+      for(std::set<test_unit_id>::iterator it(to_be_processed_next.begin()); it != to_be_processed_next.end(); ++it)
       {
         const junit_impl::test_unit_& v = map_tests[*it];
-        if(to_be_processed_next.count(v.parent) != 0)
+        test_unit& unit = boost::unit_test::framework::get( *it, v.tu_type );
+        if(to_be_processed_next.count(unit.p_parent_id) != 0)
         {
-          to_be_processed.erase(v.parent);
+          to_be_processed.erase(unit.p_parent_id);
         }
       }
 
       //to_be_processed_next.swap(to_be_processed);
     }
 
+#if 0
+    counter_prop    p_assertions_passed;
+    counter_prop    p_assertions_failed;
+    counter_prop    p_warnings_failed;
+    counter_prop    p_expected_failures;
+    counter_prop    ;
+    counter_prop    p_test_cases_warned;
+    counter_prop    ;
+    counter_prop    ;
+    counter_prop    ;
+#endif
 
     ostr << "<testsuites" 
-      << " disabled" << utils::attr_value() << root.disabled_nb
-      << " errors"   << utils::attr_value() << root.error_nb
-      << " failures" << utils::attr_value() << root.failure_nb 
+      << " disabled" << utils::attr_value() << root.p_test_cases_skipped
+      << " errors"   << utils::attr_value() << root.p_test_cases_aborted
+      << " failures" << utils::attr_value() << root.p_test_cases_failed
       << " name"     << utils::attr_value() << "root" // todo replace by the module name
       << " tests"    << utils::attr_value() << root.test_nb
       << " time"     << utils::attr_value() << root.time
@@ -211,7 +223,8 @@ junit_log_formatter::log_finish( std::ostream& ostr )
     for(map_trace_t::iterator it(map_tests.begin()); it != map_tests.end(); ++it)
     {
       std::ostringstream o_current_test;
-      const std::string &name = it->first;
+      test_unit& unit = boost::unit_test::framework::get( it->first, it->second.tu_type );
+      const std::string &name = unit.full_name();
       junit_impl::test_unit_& v = it->second;
 
       o_current_test << 
@@ -248,7 +261,7 @@ junit_log_formatter::log_finish( std::ostream& ostr )
          << " expected_failures"        << utils::attr_value() << tr.p_expected_failures;
 #endif
 
-      if(v.skipped)
+      if(v.p_skipped)
       {
         o_current_test << "<skipped/>" << std::endl;
         o_current_test << "<system-out>" << std::endl;
@@ -299,12 +312,10 @@ junit_log_formatter::log_build_info( std::ostream& ostr )
 void
 junit_log_formatter::test_unit_start( std::ostream& ostr, test_unit const& tu )
 {
-    junit_impl::test_unit_& v = map_tests[tu.full_name()];
-    current_test_unit = map_tests.find(tu.full_name());
+    junit_impl::test_unit_& v = map_tests[framework::current_test_case_id()];
+    v.tu_type = tu.p_type;
 
-    v.test_id = tu.p_id;
-    v.test_type = tu.p_type;
-    v.parent = framework::get<test_suite>( tu.p_parent_id ).full_name();
+    //v.parent = framework::get<test_suite>( tu.p_parent_id ).full_name();
 
     if( !tu.p_file_name.empty() )
         ostr << BOOST_TEST_L( " file" ) << utils::attr_value() << tu.p_file_name
@@ -316,11 +327,11 @@ junit_log_formatter::test_unit_start( std::ostream& ostr, test_unit const& tu )
 void
 junit_log_formatter::test_unit_finish( std::ostream& ostr, test_unit const& tu, unsigned long elapsed )
 {
-    junit_impl::test_unit_ &v = map_tests[tu.full_name()];
+    junit_impl::test_unit_ &v = map_tests[framework::current_test_case_id()];
     v.disabled = !tu.is_enabled();
     v.time = double(elapsed) / 1000;
 
-    current_test_unit = map_tests.find(v.parent);
+    //current_test_unit = map_tests.find(v.parent);
 }
 
 //____________________________________________________________________________//
@@ -330,8 +341,8 @@ junit_log_formatter::test_unit_skipped( std::ostream& ostr, test_unit const& tu,
 {
     if(tu.p_type == TUT_CASE)
     {
-      junit_impl::test_unit_& v = map_tests[tu.full_name()];
-      v.skipped = true;
+      junit_impl::test_unit_& v = map_tests[framework::current_test_case_id()];
+      v.set_skipped(true);
       v.cdata.assign(reason.begin(), reason.end());
     }
 }
@@ -385,29 +396,38 @@ junit_log_formatter::log_entry_start( std::ostream& ostr, log_entry_data const& 
                            BOOST_UTL_ET_FATAL_ERROR ///< Fatal error notification message
 #endif
 
-    if(let == unit_test_log_formatter::BOOST_UTL_ET_INFO)
+    junit_impl::test_unit_& v = map_tests[framework::current_test_case_id()];
+    switch(let)
     {
+      case unit_test_log_formatter::BOOST_UTL_ET_INFO:
+        break;
+      case unit_test_log_formatter::BOOST_UTL_ET_MESSAGE:
+        break;
+      case unit_test_log_formatter::BOOST_UTL_ET_WARNING:
+        v.p_warnings_failed.value++;
+        break;
+      default:
+      case unit_test_log_formatter::BOOST_UTL_ET_ERROR:
+      case unit_test_log_formatter::BOOST_UTL_ET_FATAL_ERROR:
+      {
+        v.p_assertions_failed.value++;
 
-    }
-
-    if(let == unit_test_log_formatter::BOOST_UTL_ET_ERROR || let == unit_test_log_formatter::BOOST_UTL_ET_FATAL_ERROR)
-    {
-      current_test_unit->second.assertions ++;
-      current_test_unit->second.error_nb ++;
-
-      std::ostringstream o;
-      m_curr_tag = "failure";
-      o << "<" << m_curr_tag
-        << " type" << utils::attr_value() 
+        std::ostringstream o;
+        m_curr_tag = "failure";
+        o << "<" << m_curr_tag
+          << " type" << utils::attr_value()
                    << (let == unit_test_log_formatter::BOOST_UTL_ET_ERROR ? "assertion error" : "fatal error")
-        << ">";
+          << ">";
       
 
-      o << BOOST_TEST_L( "Assertion failed at " ) 
-        << entry_data.m_file_name << ":" << entry_data.m_line_num << std::endl;
+        o << BOOST_TEST_L( "Assertion failed at " )
+          << entry_data.m_file_name << ":" << entry_data.m_line_num << std::endl;
 
-      m_value_closed = false;
-      current_test_unit->second.failure += o.str();
+        v.failure += o.str();
+        m_value_closed = false;
+
+        break;
+      }
     }
 
 #if 0
@@ -429,9 +449,11 @@ junit_log_formatter::log_entry_start( std::ostream& ostr, log_entry_data const& 
 void
 junit_log_formatter::log_entry_value( std::ostream& ostr, const_string value )
 {
+    junit_impl::test_unit_& v = map_tests[framework::current_test_case_id()];
     std::ostringstream o;
     utils::print_escaped_cdata( o, value );
-    current_test_unit->second.failure += o.str();
+    //current_test_unit->second.failure += o.str();
+    v.failure += o.str();
 }
 
 //____________________________________________________________________________//
@@ -448,7 +470,8 @@ junit_log_formatter::log_entry_finish( std::ostream& ostr )
 
     if(!m_curr_tag.empty())
     {
-      current_test_unit->second.failure += "</" + m_curr_tag + ">";
+      junit_impl::test_unit_& v = map_tests[framework::current_test_case_id()];
+      v.failure += "</" + m_curr_tag + ">";
       m_curr_tag.clear();
     }
 

@@ -30,24 +30,25 @@ namespace boost {
 namespace unit_test {
 namespace output {
 
+  class junit_log_formatter;
+
   namespace junit_impl
   {
-    struct test_unit_
+    struct test_unit_ : public test_results
     {
-      test_unit::id_t test_id;
-      test_unit_type test_type;
-      std::string parent;
-      std::size_t disabled;
-      std::size_t failure_nb;
-      std::size_t error_nb;
-      std::size_t disabled_nb;
-      std::size_t assertions;
-      std::size_t test_nb;
+      test_unit_type tu_type; // stored because otherwise difficult to retrieve
       double time; // in sec
+      size_t test_nb; // number of test cases contained in the unit
       
-      bool skipped;
+      bool disabled;
       std::string cdata;
       std::string failure;
+
+      void set_skipped(bool is_skipped = true) {
+        this->p_skipped.value = is_skipped;
+      }
+
+      friend class boost::unit_test::output::junit_log_formatter;
     };
   }
 
@@ -91,9 +92,8 @@ public:
 
 
 private:
-    typedef std::map<std::string, junit_impl::test_unit_> map_trace_t;
+    typedef std::map<test_unit_id, junit_impl::test_unit_> map_trace_t;
     map_trace_t map_tests;
-    map_trace_t::iterator current_test_unit;
     std::string m_curr_tag;
     bool m_value_closed;
 };
