@@ -44,9 +44,9 @@ namespace output {
       std::string cdata;
       std::string failure;
 
-      void set_skipped(bool is_skipped = true) {
-        this->p_skipped.value = is_skipped;
-      }
+      //void set_skipped(bool is_skipped = true) {
+      //  this->p_skipped.value = is_skipped;
+      //}
 
       friend class boost::unit_test::output::junit_log_formatter;
     };

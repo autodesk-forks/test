@@ -28,6 +28,8 @@ typedef boost::onullstream onullstream_type;
 
 using boost::test_tools::output_test_stream;
 using namespace boost::unit_test;
+namespace utf = boost::unit_test;
+
 
 //____________________________________________________________________________//
 
@@ -63,6 +65,7 @@ void check( output_test_stream& output, output_format log_format, test_unit_id i
 {
     boost::unit_test::unit_test_log.set_format(log_format);
 
+#if 0
     results_reporter::confirmation_report( id );
     output << "*************************************************************************\n";
     BOOST_TEST( output.match_pattern() );
@@ -74,6 +77,16 @@ void check( output_test_stream& output, output_format log_format, test_unit_id i
     results_reporter::detailed_report( id );
     output << "*************************************************************************\n";
     BOOST_TEST( output.match_pattern() );
+#endif
+
+    //utf::runtime_config::init( argc, (char**)argv );
+    //utf::framework::impl::setup_for_execution( *master_ts );
+    utf::framework::finalize_setup_phase(id);
+
+
+    utf::test_case_counter tcc;
+    utf::traverse_test_tree( id, tcc );
+    //BOOST_TEST( tcc.p_count == expected );
 }
 
 //____________________________________________________________________________//
@@ -108,7 +121,7 @@ BOOST_AUTO_TEST_CASE( test_result_reports )
     guard G;
     ut_detail::ignore_unused_variable_warning( G );
 
-#define PATTERN_FILE_NAME "log_report_test.pattern"
+#define PATTERN_FILE_NAME "log-report-test.pattern"
 
     std::string pattern_file_name(
         framework::master_test_suite().argc == 1

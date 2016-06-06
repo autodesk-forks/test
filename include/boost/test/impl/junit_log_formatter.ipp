@@ -342,7 +342,7 @@ junit_log_formatter::test_unit_skipped( std::ostream& ostr, test_unit const& tu,
     if(tu.p_type == TUT_CASE)
     {
       junit_impl::test_unit_& v = map_tests[framework::current_test_case_id()];
-      v.set_skipped(true);
+      v.p_skipped.value = true;
       v.cdata.assign(reason.begin(), reason.end());
     }
 }

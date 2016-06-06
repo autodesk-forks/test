@@ -32,6 +32,9 @@ class  unit_test_monitor_t;
 class  unit_test_log_t;
 
 class  unit_test_log_formatter;
+namespace output {
+  class junit_log_formatter;
+}
 struct log_entry_data;
 struct log_checkpoint_data;
 

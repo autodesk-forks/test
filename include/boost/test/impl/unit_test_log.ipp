@@ -315,9 +315,9 @@ unit_test_log_t::operator<<( log::end const& )
     if( s_log_impl().m_entry_in_progress ) {
         log_entry_context( s_log_impl().m_entry_data.m_level );
 
-       BOOST_TEST_FOREACH( unit_test_log_data_helper_impl&, current_logger_data, s_log_impl().m_log_formatter_data ) {
+        BOOST_TEST_FOREACH( unit_test_log_data_helper_impl&, current_logger_data, s_log_impl().m_log_formatter_data ) {
             current_logger_data.m_log_formatter->log_entry_finish( current_logger_data.stream() );
-       }
+        }
 
         s_log_impl().m_entry_in_progress = false;
     }
